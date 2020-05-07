@@ -1,0 +1,340 @@
+#+TITLE: [[https://courses.packtpub.com/courses/take/the-applied-sql-data-analytics-workshop/][SQL Data Analytics Workshop]]
+
+SQL Analytics in Postgres
+
+This is course notes of the workshop written in org-mode.  Org-mode had good support for connecting to postgres and executed the src blocks and printed the results inline.
+* Setup
+ Get the data from git
+
+https://github.com/PacktWorkshops/The-Applied-SQL-Data-Analytics-Workshop
+
+** Start postgres database  from OS; Mine is windows
+
+#+BEGIN_SRC shell
+pg_ctl start
+#+END_SRC
+
+** Create the database  by logging in as super user
+
+#+headers: :cmdline -h localhost -U postgres -p 5432 -d postgres
+#+BEGIN_SRC sql :engine postgresql 
+select pg_terminate_backend(pid) from pg_stat_activity where datname='sqlda';
+drop database IF EXISTS sqlda;
+drop user IF EXISTS sqldaadmin;
+create user sqldaadmin  password 'sqldaadmin';
+ALTER USER sqldaadmin WITH SUPERUSER;
+create database sqlda owner sqldaadmin;
+#+END_SRC
+
+#+RESULTS:
+| pg_terminate_backend |
+|----------------------|
+| DROP DATABASE        |
+| DROP ROLE            |
+| CREATE ROLE          |
+| ALTER ROLE           |
+| CREATE DATABASE      |
+
+Now insert the data
+
+#+headers: :cmdline -h localhost -U sqldaadmin -p 5432 -d sqlda
+#+BEGIN_SRC sql :engine postgresql :dir D:/Projects/the-applied-sql-data-analytics-workshop/
+  \i Datasets/data.dump;
+#+END_SRC
+
+#+RESULTS:
+|   |
+
+#+headers: :cmdline -h localhost -U sqldaadmin -p 5432 -d sqlda
+#+BEGIN_SRC sql :engine postgresql 
+  \dt
+#+END_SRC
+
+#+RESULTS:
+| List of relations |                              |       |            |
+|-------------------+------------------------------+-------+------------|
+| Schema            | Name                         | Type  | Owner      |
+| public            | closest_dealerships          | table | sqldaadmin |
+| public            | countries                    | table | sqldaadmin |
+| public            | customer_sales               | table | sqldaadmin |
+| public            | customer_survey              | table | sqldaadmin |
+| public            | customers                    | table | sqldaadmin |
+| public            | dealerships                  | table | sqldaadmin |
+| public            | emails                       | table | sqldaadmin |
+| public            | products                     | table | sqldaadmin |
+| public            | public_transportation_by_zip | table | sqldaadmin |
+| public            | sales                        | table | sqldaadmin |
+| public            | salespeople                  | table | sqldaadmin |
+| public            | top_cities_data              | table | sqldaadmin |
+
+#+headers: :cmdline -h localhost -U sqldaadmin -p 5432 -d sqlda
+#+BEGIN_SRC sql :engine postgresql 
+SELECT * from sales LIMIT 10;
+#+END_SRC
+
+#+RESULTS:
+| customer_id | product_id | sales_transaction_date | sales_amount | channel    | dealership_id |
+|-------------+------------+------------------------+--------------+------------+---------------|
+|           1 |          7 | 2017-07-19 08:38:41    |      479.992 | internet   |               |
+|          22 |          7 | 2017-08-14 09:59:02    |       599.99 | dealership |            20 |
+|         145 |          7 | 2019-01-20 10:40:11    |      479.992 | internet   |               |
+|         289 |          7 | 2017-05-09 14:20:04    |      539.991 | dealership |             7 |
+|         331 |          7 | 2019-05-21 20:03:21    |      539.991 | dealership |             4 |
+|         334 |          7 | 2017-06-14 11:37:10    |       599.99 | dealership |             5 |
+|         396 |          7 | 2019-02-26 09:25:19    |      479.992 | dealership |            10 |
+|         564 |          7 | 2017-11-15 01:28:23    |       599.99 | dealership |             3 |
+|         586 |          7 | 2017-06-25 22:53:37    |      539.991 | dealership |            18 |
+|         681 |          7 | 2019-01-13 08:28:44    |       599.99 | dealership |             5 |
+
+* Introduction
+#+BEGIN_SRC sql
+SELECT model
+FROM products
+ORDER BY production_start_date
+LIMIT 5;
+#+END_SRC
+
+If we are only interested in products that are not being produced, we can use the IS NOT NULL clause, as shown in the following query:
+
+#+BEGIN_SRC sql
+SELECT *
+FROM products
+WHERE production_end_date IS NOT NULL;
+#+END_SRC
+* Data Preparation
+* Aggregate and Window Functions
+#+BEGIN_SRC sql
+  SELECT customer_id, title, first_name, last_name, gender,
+  COUNT(*) OVER () as total_customers
+  FROM customers
+  ORDER BY customer_id;
+
+  SELECT customer_id, title, first_name, last_name, gender,
+  COUNT(*) OVER (PARTITION BY gender) as total_customers
+  FROM customers
+  ORDER BY customer_id;
+
+#+END_SRC
+
+* Importing and Exporting Data
+** Serverside 
+#+headers: :cmdline -h localhost -U sqldaadmin -p 5432 -d sqlda
+#+BEGIN_SRC sql :engine postgresql 
+COPY (SELECT * FROM customers LIMIT 5) TO STDOUT WITH CSV HEADER DELIMITER '|';
+#+END_SRC
+
+#+RESULTS:
+| customer_id | title | first_name | last_name | suffix | email                     | gender |      ip_address |        phone | street_address      | city        | state | postal_code | latitude | longitude | date_added          |
+|-------------+-------+------------+-----------+--------+---------------------------+--------+-----------------+--------------+---------------------+-------------+-------+-------------+----------+-----------+---------------------|
+|           1 |       | Arlena     | Riveles   |        | ariveles0@stumbleupon.com | F      |   98.36.172.246 |              |                     |             |       |             |          |           | 2017-04-23 00:00:00 |
+|           2 | Dr    | Ode        | Stovin    |        | ostovin1@npr.org          | M      |    16.97.59.186 | 314-534-4361 | 2573 Fordem Parkway | Saint Louis | MO    |       63116 |  38.5814 |  -90.2625 | 2014-10-02 00:00:00 |
+|           3 |       | Braden     | Jordan    |        | bjordan2@geocities.com    | M      |   192.86.248.59 |              | 5651 Kennedy Park   | Pensacola   | FL    |       32590 |  30.6143 |  -87.2758 | 2018-10-27 00:00:00 |
+|           4 |       | Jessika    | Nussen    |        | jnussen3@salon.com        | F      | 159.165.138.166 | 615-824-2506 | 224 Village Circle  | Nashville   | TN    |       37215 |  36.0986 |  -86.8219 | 2017-09-03 00:00:00 |
+|           5 |       | Lonnie     | Rembaud   |        | lrembaud4@discovery.com   | F      |    18.131.58.65 | 786-499-3431 | 38 Lindbergh Way    | Miami       | FL    |       33124 |  25.5584 |  -80.4582 | 2014-03-06 00:00:00 |
+
+** Client Side
+#+headers: :cmdline -h localhost -U sqldaadmin -p 5432 -d sqlda
+#+BEGIN_SRC sql :engine postgresql 
+\copy customers TO 'my_file.csv' WITH CSV HEADER DELIMITER '|' NULL '' ;
+\copy (SELECT * FROM cities) TO 'cities.csv’ WITH CSV HEADER DELIMITER ',';
+#+END_SRC
+** Excel dumping
+   1. Dump CSV  by using =COPY= or =\copy=
+   2. select the data in excel and go to insert to create a chart
+** Using R with such dumps
+#+BEGIN_SRC R
+library(RPostgreSQL)
+con <- dbConnect(PostgreSQL(), host="my_host", user="my_username", password="my password", dbname="zoomzoom", port=5432)
+result <- dbGetQuery(con, "select * from customers limit 10;")
+result
+#+END_SRC
+** Using Python
+#+begin_src python
+import psycopg2
+with psycopg2.connect(host="my_host", user="my_username", password="my_password", dbname="zoomzoom", port=5432) as conn:
+  with conn.cursor() as cur:
+    cur.execute("SELECT * FROM customers LIMIT 5")
+    records = cur.fetchall()
+records
+#+end_src
+
+* Analytics Using Complex Data Types
+Dates, Arrays, JSONB, TextAnalytics, Geospatial etc.
+** Arrays
+ #+headers: :cmdline -h localhost -U sqldaadmin -p 5432 -d sqlda
+ #+BEGIN_SRC sql :engine postgresql 
+--  SELECT ARRAY['Lemon', 'Bat Limited Edition'] AS example_purchased_products;
+-- SELECT product_type, ARRAY_AGG(DISTINCT model) AS models FROM products GROUP BY 1;
+-- SELECT product_type, ARRAY_AGG(model ORDER BY year) AS models FROM products GROUP BY 1;
+-- SELECT UNNEST(ARRAY[123, 456, 789]) AS example_ids;
+-- SELECT STRING_TO_ARRAY('hello there how are you?', ' ');
+SELECT ARRAY_TO_STRING(ARRAY['Lemon', 'Bat Limited Edition'], ', ')  AS example_purchased_products;
+#+END_SRC
+
+#+RESULTS:
+| example_purchased_products |
+|----------------------------|
+| Lemon, Bat Limited Edition |
+
+** Date and Time
+
+Configure datetime formats
+#+headers: :cmdline -h localhost -U sqldaadmin -p 5432 -d sqlda
+#+BEGIN_SRC sql :engine postgresql 
+SHOW datestyle;
+SELECT '1/8/1999'::DATE;
+SELECT '1-8-1999'::DATE;
+SELECT current_date;
+SELECT now() AT TIME ZONE 'EST';
+SELECT now();
+#+END_SRC
+
+#+RESULTS:
+| DateStyle |
+|-----------|
+| ISO, MDY  |
+
+#+headers: :cmdline -h localhost -U sqldaadmin -p 5432 -d sqlda
+#+BEGIN_SRC sql :engine postgresql 
+                SELECT 
+                  current_date,
+                  EXTRACT(year FROM current_date) AS year,
+                  EXTRACT(month FROM current_date) AS month,
+                  EXTRACT(day FROM current_date) AS day,
+                  EXTRACT(dow FROM current_date) AS day_of_week,
+                  EXTRACT(week FROM current_date) AS week_of_year,
+                  EXTRACT(quarter FROM current_date) AS quarter;
+
+              SELECT NOW(), DATE_TRUNC('month', NOW());
+
+            SELECT DATE_TRUNC('quarter', NOW()) AS quarter,
+                   SUM(sales_amount) AS total_quarterly_sales
+              FROM sales
+             GROUP BY 1
+             ORDER BY 1 DESC;
+
+          SELECT INTERVAL '5 days';
+
+        SELECT TIMESTAMP '2016-03-01 00:00:00' - TIMESTAMP '2016-02-01 00:00:00' AS days_in_feb;
+        SELECT TIMESTAMP '2016-03-01 00:00:00' + INTERVAL '7 days' AS new_date;
+      SELECT DATE '2016-03-01' + 7 AS new_date;
+    SELECT DATE '2016-03-01' - DATE '2016-02-01' AS days_in_feb;
+
+   SELECT
+      DATE_TRUNC('month', sales_transaction_date)  AS month_date,
+      COUNT(1) AS number_of_sales
+  FROM sales
+  WHERE EXTRACT(year FROM sales_transaction_date) = 2018
+  GROUP BY 1
+  ORDER BY 1;
+
+  SELECT
+    DATE_TRUNC('month', date_added)  AS month_date,
+    COUNT(1) AS number_of_new_customers
+  FROM customers
+  WHERE EXTRACT(year FROM date_added) = 2018
+  GROUP BY 1
+  ORDER BY 1;
+#+END_SRC
+
+** Geospatial
+#+headers: :cmdline -h localhost -U sqldaadmin -p 5432 -d sqlda
+#+BEGIN_SRC sql :engine postgresql 
+CREATE EXTENSION cube;
+CREATE EXTENSION earthdistance;
+
+SELECT
+    point(longitude, latitude)
+FROM customers
+LIMIT 10;
+
+–  The earthdistance module also allows us to calculate the distance between points in miles:
+SELECT
+    point(-90, 38) <@> point(-91, 37) AS distance_in_miles;
+
+#+END_SRC
+** JSON/JSONB
+#+headers: :cmdline -h localhost -U sqldaadmin -p 5432 -d sqlda
+#+BEGIN_SRC sql :engine postgresql 
+ SELECT row_to_json(c) FROM customers c limit 1;
+ #+END_SRC
+
+ #+RESULTS:
+ | row_to_json                                                                                                                                                                                                                                                                                                               |
+ |---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+ | {"customer_id":1,"title":null,"first_name":"Arlena","last_name":"Riveles","suffix":null,"email":"ariveles0@stumbleupon.com","gender":"F","ip_address":"98.36.172.246","phone":null,"street_address":null,"city":null,"state":null,"postal_code":null,"latitude":null,"longitude":null,"date_added":"2017-04-23T00:00:00"} |
+
+ #+headers: :cmdline -h localhost -U sqlda -p 5432 -d sqlda
+ #+BEGIN_SRC sql :engine postgresql
+   SELECT
+     '{
+     "a": 1,
+     "b": 2,
+     "c": 3
+     }'::JSON -> 'b' AS data;
+ #+END_SRC
+
+ #+RESULTS:
+ | data |
+ |------|
+ |    2 |
+
+ #+headers: :cmdline -h localhost -U sqlda -p 5432 -d sqlda
+ #+BEGIN_SRC sql :engine postgresql
+   SELECT
+     '{
+     "a": 1,
+     "b": [
+     {"d": 4},
+     {"d": 6},
+     {"d": 4}
+     ],
+     "c": 3
+     }'::JSON #> ARRAY['b', '1', 'd'] AS data;
+   SELECT * FROM customer_sales WHERE customer_json @> '{"customer_id":20}'::JSONB;
+
+   SELECT * FROM customer_sales WHERE customer_json @> '{"customer_id":20}'::JSONB;
+
+   SELECT
+     jsonb_path_exists(customer_json, '$.sales[0]')
+   FROM customer_sales
+    LIMIT 3;  SELECT
+                feedback,
+                to_tsvector('english', feedback) AS tsvectorized_feedback
+                FROM customer_survey
+               LIMIT 1;
+ #+END_SRC
+
+
+
+* Assesment
+A user has a table “EmployeeData” in the SQL database. The user wants to delete the top 10 records form the EmployeeData table. Which SQL statement should the user use?
+Not postgres may be
+#+BEGIN_SRC sql
+DELETE  TOP (100) FROM employee;
+#+END_SRC
+
+
+
+#+BEGIN_SRC sql
+SELECT NULLIF (’A’, ’B’); – returns ’A’
+#+END_SRC
+** Text Analytics
+#+BEGIN_SRC sql
+  SELECT
+      feedback,
+      to_tsvector('english', feedback) AS tsvectorized_feedback
+  FROM customer_survey
+  LIMIT 1;
+
+#+END_SRC
+
+
+ Which statement is used to create a new table and insert data returned by a query?
+ #+BEGIN_SRC sql
+ SELCT INTO
+ #+END_SRC
+ Which of the following functions is used to calculate ages between two timestamps and return a “symbolic” result that uses years and months?
+ AGE()
+ Which keyword refers to the last record in window function query using the window frame clause?
+ UNBOUNDED FOLLOWING
