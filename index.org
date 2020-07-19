@@ -306,7 +306,6 @@ SELECT
  #+END_SRC
 
 
-
 * Assesment
 A user has a table “EmployeeData” in the SQL database. The user wants to delete the top 10 records form the EmployeeData table. Which SQL statement should the user use?
 Not postgres may be
